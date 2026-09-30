@@ -331,7 +331,7 @@
                 class="btn-bounce w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow border-b-4 border-emerald-800 text-base">
                 Buka Rekap Real-time
             </button>
-            <p class="text-[11px] text-slate-400 mt-3 font-semibold">Petunjuk: Ibu Sri Haryati, S.Pd.</p>
+            <p class="text-[11px] text-slate-400 mt-3 font-semibold">Petunjuk: Ibu Sri Haryati, S.Pd. (PIN: 1234)</p>
         </div>
     </div>
 
@@ -385,7 +385,7 @@
 
             <!-- Modal Bottom Actions -->
             <div class="flex flex-wrap justify-between items-center gap-3 pt-2 border-t">
-                <button onclick="clearRecapData()"
+                <button onclick="promptClearRecap()"
                     class="text-rose-600 hover:text-rose-800 font-bold text-xs sm:text-sm flex items-center gap-1">
                     <i class="fa-solid fa-trash-can"></i> Hapus Semua Data
                 </button>
@@ -399,6 +399,30 @@
                         Tutup
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM CONFIRMATION MODAL (No alert/confirm) -->
+    <div id="confirm-modal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white border-4 border-rose-500 rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl">
+            <div
+                class="w-14 h-14 bg-rose-100 rounded-full border-2 border-rose-400 flex items-center justify-center mx-auto mb-3 text-rose-600 text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-800 mb-2">Hapus Rekap Nilai?</h3>
+            <p class="text-xs text-slate-600 mb-5 font-semibold">Apakah Anda yakin ingin menghapus semua data rekap
+                nilai lokal di peramban ini?</p>
+            <div class="flex gap-3">
+                <button onclick="executeClearRecap()"
+                    class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3 rounded-xl shadow text-sm">
+                    Ya, Hapus
+                </button>
+                <button onclick="closeConfirmModal()"
+                    class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold py-3 rounded-xl text-sm">
+                    Batal
+                </button>
             </div>
         </div>
     </div>
@@ -437,23 +461,18 @@
                 updateServerStatus(false);
             });
 
-            // 3. LISTEN REAL-TIME UPDATE (Dashboard Guru Update Otomatis)
+            // LISTEN REAL-TIME UPDATE (Dashboard Guru Update Otomatis)
             socket.on('nilai_baru', (dataSiswaBaru) => {
                 console.log("Ada nilai baru masuk secara real-time!", dataSiswaBaru);
 
-                // Formatkan data baru agar seragam
                 const formattedData = normalizeDataRow(dataSiswaBaru);
-
-                // Masukkan ke array global
                 window.currentRealtimeRecords.unshift(formattedData);
 
-                // Update tampilan tabel jika modal terbuka
                 const modal = document.getElementById('teacher-modal');
                 if (modal && !modal.classList.contains('hidden')) {
                     renderTabelGuru(window.currentRealtimeRecords);
                 }
 
-                // Tampilkan notifikasi toast
                 const scoreText = formattedData.skor !== undefined ? formattedData.skor : formattedData.score;
                 tampilkanNotifikasiToast(`Nilai baru masuk: <b>${escapeHtml(formattedData.nama || formattedData.name)}</b> (Skor: ${scoreText})`);
             });
@@ -462,13 +481,9 @@
             console.error("Gagal menginisialisasi Socket.io:", e);
         }
 
-        // FUNGSI UPDATE STATUS BADGE SERVER (Support Multiple ID / Class Auto-Detect)
+        // UPDATE STATUS BADGE SERVER
         function updateServerStatus(isOnline) {
-            // Cari elemen berdasarkan ID utama atau ID alternatif
-            const badge = document.getElementById('server-status-badge') ||
-                document.getElementById('server-status-indicator') ||
-                document.querySelector('[class*="Offline"], [class*="Terhubung"]');
-
+            const badge = document.getElementById('server-status-badge');
             if (!badge) return;
 
             if (isOnline) {
@@ -480,7 +495,7 @@
             }
         }
 
-        // 1. FUNGSI KIRIM SKOR KE SERVER BACKEND MILIK SENDIRI (Siswa)
+        // KIRIM SKOR KE SERVER BACKEND
         async function kirimSkorKeServerMilikSendiri(namaSiswa, skorSiswa, correctCount, totalQuestions) {
             const payload = {
                 nama: namaSiswa,
@@ -491,7 +506,6 @@
                 timestamp: Date.now()
             };
 
-            // Simpan dulu secara lokal di browser sebagai cadangan
             saveLocalRecord(payload);
 
             try {
@@ -515,7 +529,7 @@
             }
         }
 
-        // 2. FUNGSI LOAD DATA PERTAMA KALI UNTUK DASHBOARD GURU
+        // LOAD DATA REKAP GURU
         async function loadDataRekapGuru() {
             try {
                 const response = await fetch(`${SERVER_URL}/api/rekap-nilai`);
@@ -523,11 +537,8 @@
                     const data = await response.json();
                     const list = Array.isArray(data) ? data : (data.data || []);
 
-                    // Urutkan data terbaru di paling atas
                     window.currentRealtimeRecords = list.map(normalizeDataRow);
                     renderTabelGuru(window.currentRealtimeRecords);
-
-                    // Tandai server dalam keadaan aktif/online
                     updateServerStatus(true);
                     return;
                 }
@@ -535,14 +546,12 @@
                 console.error("Gagal mengambil data rekap dari server backend:", error);
             }
 
-            // Fallback: Jika server mati/terputus, gunakan LocalStorage
             updateServerStatus(false);
             const localData = getLocalRecords();
             window.currentRealtimeRecords = localData;
             renderTabelGuru(window.currentRealtimeRecords);
         }
 
-        // Helper untuk menormalisasi struktur data dari server / lokal
         function normalizeDataRow(item) {
             return {
                 name: item.nama || item.name || 'Siswa',
@@ -554,7 +563,6 @@
             };
         }
 
-        // Helper Toast Notification
         function tampilkanNotifikasiToast(pesan) {
             const container = document.getElementById('toast-container');
             if (!container) return;
@@ -562,11 +570,11 @@
             const toast = document.createElement('div');
             toast.className = 'pointer-events-auto bg-slate-900/90 text-white p-3 sm:p-4 rounded-2xl shadow-xl border-2 border-emerald-400 text-xs sm:text-sm flex items-center gap-3 toast-slide-in backdrop-blur-md';
             toast.innerHTML = `
-        <div class="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-white font-bold">
-            <i class="fa-solid fa-bell"></i>
-        </div>
-        <div class="flex-1">${pesan}</div>
-    `;
+                <div class="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-white font-bold">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div class="flex-1">${pesan}</div>
+            `;
 
             container.appendChild(toast);
 
@@ -578,7 +586,6 @@
             }, 4000);
         }
 
-        // Helper Local Storage Backup
         function saveLocalRecord(record) {
             try {
                 let records = getLocalRecords();
@@ -830,10 +837,19 @@
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(10 * scale, 0);
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(12 * scale, -30 * scale);
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(8 * scale, -28 * scale);
+                ctx.stroke();
+
+                // Bat
+                ctx.beginPath();
                 ctx.lineWidth = 6 * scale;
                 ctx.strokeStyle = '#b45309';
                 ctx.moveTo(10 * scale, -28 * scale);
                 ctx.lineTo(25 * scale, -45 * scale);
+            } else if (pose === 'catch') {
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(10 * scale, 0);
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(-15 * scale, -35 * scale);
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(15 * scale, -35 * scale);
             } else {
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(10 * scale, 0);
@@ -889,18 +905,18 @@
 
         function drawSuccessAnimation(w, h, f) {
             ctx.fillStyle = '#047857';
-            ctx.font = '900 28px Fredoka';
+            ctx.font = '900 24px Fredoka';
             ctx.textAlign = 'center';
-            ctx.fillText('HEBAT! JAWABAN BENAR! 🎉', w / 2, 50);
+            ctx.fillText('HEBAT! JAWABAN BENAR! 🎉', w / 2, 45);
             const bY = (h - 50) - Math.abs(Math.sin(f * 0.15)) * 60;
             drawBall(w / 2, bY, 18, '#f59e0b');
         }
 
         function drawWrongAnimation(w, h, f) {
             ctx.fillStyle = '#b91c1c';
-            ctx.font = '900 24px Fredoka';
+            ctx.font = '900 22px Fredoka';
             ctx.textAlign = 'center';
-            ctx.fillText('Ayo Coba Lagi! Semangat! 💪', w / 2, 50);
+            ctx.fillText('Ayo Coba Lagi! Semangat! 💪', w / 2, 45);
             const bX = (w / 2) + Math.sin(f * 0.1) * 30;
             drawBall(bX, h - 45, 14, '#64748b');
         }
@@ -1084,7 +1100,6 @@
                 try { confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 } }); } catch (e) { }
             }
 
-            // Kirim Nilai ke Server Backend Milik Sendiri
             await kirimSkorKeServerMilikSendiri(studentName, score, correctCount, quizQuestions.length);
         }
 
@@ -1155,12 +1170,20 @@
             document.getElementById('teacher-modal').classList.add('hidden');
         }
 
-        function clearRecapData() {
-            if (confirm("Apakah Ibu Sri Haryati yakin ingin menghapus semua rekap nilai di browser ini?")) {
-                localStorage.removeItem('pjok_quiz_recap');
-                window.currentRealtimeRecords = [];
-                renderTabelGuru([]);
-            }
+        function promptClearRecap() {
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        }
+
+        function executeClearRecap() {
+            localStorage.removeItem('pjok_quiz_recap');
+            window.currentRealtimeRecords = [];
+            renderTabelGuru([]);
+            closeConfirmModal();
+            tampilkanNotifikasiToast("Data rekap lokal berhasil dibersihkan!");
         }
 
         function downloadCSV() {
@@ -1170,7 +1193,7 @@
             }
 
             if (records.length === 0) {
-                alert("Belum ada data nilai untuk diunduh!");
+                tampilkanNotifikasiToast("⚠️ Belum ada data nilai untuk diunduh!");
                 return;
             }
 
