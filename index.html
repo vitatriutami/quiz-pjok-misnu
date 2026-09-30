@@ -5,61 +5,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz PJOK Kelas 2 - Gerak Dasar Manipulatif</title>
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+
     <!-- Google Fonts for Kids -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Quicksand:wght@500;700&display=swap"
         rel="stylesheet">
+
+    <!-- Socket.io Client CDN -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
     <!-- Canvas Confetti CDN -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global Firebase state & variables
-        window.firebaseDb = null;
-        window.firebaseAuth = null;
-        window.dbCollectionPath = null;
-        window.currentRealtimeRecords = [];
-
-        async function initFirebase() {
-            try {
-                const firebaseConfig = typeof __firebase_config !== 'undefined'
-                    ? JSON.parse(__firebase_config)
-                    : { apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo-project" };
-
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'pjok-mis-nu-palangkaraya';
-                const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
-                const db = getFirestore(app);
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                window.firebaseDb = db;
-                window.firebaseAuth = auth;
-                window.dbCollectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'quiz_results');
-
-                console.log("Firebase initialized for real-time recap.");
-                if (window.listenToRealtimeResults) {
-                    window.listenToRealtimeResults();
-                }
-            } catch (err) {
-                console.warn("Firebase sync fallback:", err);
-            }
-        }
-        initFirebase();
-    </script>
 
     <style>
         * {
@@ -111,26 +75,21 @@
             animation: gentle-bounce 2.5s infinite ease-in-out;
         }
 
-        /* Custom pulse visual indicator */
-        @keyframes pulse-ring {
-            0% {
-                transform: scale(0.95);
-                opacity: 0.8;
+        /* Toast animation */
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
             }
 
-            50% {
-                transform: scale(1.05);
+            to {
+                transform: translateX(0);
                 opacity: 1;
-            }
-
-            100% {
-                transform: scale(0.95);
-                opacity: 0.8;
             }
         }
 
-        .pulse-border {
-            animation: pulse-ring 2s infinite ease-in-out;
+        .toast-slide-in {
+            animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
         /* Hide Scrollbars smoothly */
@@ -146,6 +105,10 @@
 </head>
 
 <body class="flex flex-col items-center justify-between p-3 sm:p-6 text-slate-800 relative min-h-screen">
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    </div>
 
     <!-- Background Animated Floating Icons -->
     <div class="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-20">
@@ -270,9 +233,9 @@
                 <!-- Dynamically populated options -->
             </div>
 
-            <!-- Encouragement Modal / Feedback Alert (Inline) -->
+            <!-- Encouragement Modal / Feedback Alert -->
             <div id="feedback-box"
-                class="hidden p-4 rounded-2xl mb-4 text-center font-bold text-lg border-4 transition-all animate-bounce">
+                class="hidden p-4 rounded-2xl mb-4 text-center font-bold text-lg border-4 transition-all">
                 <!-- Feedback message here -->
             </div>
 
@@ -368,7 +331,7 @@
                 class="btn-bounce w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow border-b-4 border-emerald-800 text-base">
                 Buka Rekap Real-time
             </button>
-            <p class="text-[11px] text-slate-400 mt-3 font-semibold">Petunjuk Ibu Sri Haryati, S.Pd.</p>
+            <p class="text-[11px] text-slate-400 mt-3 font-semibold">Petunjuk: Ibu Sri Haryati, S.Pd.</p>
         </div>
     </div>
 
@@ -393,10 +356,10 @@
 
             <div
                 class="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 mb-3 text-xs text-emerald-800 font-semibold flex items-center justify-between">
-                <span><i class="fa-solid fa-wifi text-emerald-600 mr-1 animate-pulse"></i> Database Cloud Real-Time
+                <span><i class="fa-solid fa-wifi text-emerald-600 mr-1 animate-pulse"></i> Server Backend Real-Time
                     Aktif</span>
-                <span class="bg-emerald-200 px-2 py-0.5 rounded text-[10px] font-extrabold text-emerald-900">Otomatis
-                    Ter-update</span>
+                <span id="server-status-badge"
+                    class="bg-emerald-200 px-2 py-0.5 rounded text-[10px] font-extrabold text-emerald-900">Terhubung</span>
             </div>
 
             <!-- Table area -->
@@ -445,15 +408,188 @@
         Quiz PJOK Kelas 2 SD/MI &bull; MIS NU Palangka Raya &bull; Sri Haryati, S.Pd.
     </footer>
 
+    <!-- SERVER & SOCKET.IO CONFIGURATION -->
     <script>
-        /* ==========================================================================
-           QUESTION BANK (10 Questions PJOK Kelas 2 SD/MI - Gerak Manipulatif)
-           ========================================================================== */
+        // BACKEND SERVER URL MILIK SENDIRI
+        const SERVER_URL = "https://quiz-pjok-misnu-be.fly.dev";
+
+        // Inisialisasi Socket.io Client
+        let socket;
+        try {
+            socket = io(SERVER_URL, {
+                transports: ['websocket', 'polling'],
+                reconnectionAttempts: 5,
+                timeout: 10000
+            });
+
+            socket.on('connect', () => {
+                console.log("Terhubung ke server Socket.io:", socket.id);
+                updateServerStatus(true);
+            });
+
+            socket.on('disconnect', () => {
+                console.warn("Terputus dari server Socket.io");
+                updateServerStatus(false);
+            });
+
+            socket.on('connect_error', (err) => {
+                console.error("Koneksi Socket.io gagal:", err.message);
+                updateServerStatus(false);
+            });
+
+            // 3. LISTEN REAL-TIME UPDATE (Dashboard Guru Update Otomatis)
+            socket.on('nilai_baru', (dataSiswaBaru) => {
+                console.log("Ada nilai baru masuk secara real-time!", dataSiswaBaru);
+
+                // Formatkan data baru agar seragam
+                const formattedData = normalizeDataRow(dataSiswaBaru);
+
+                // Masukkan ke array global
+                window.currentRealtimeRecords.unshift(formattedData);
+
+                // Update tampilan tabel jika modal terbuka
+                const modal = document.getElementById('teacher-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    renderTabelGuru(window.currentRealtimeRecords);
+                }
+
+                // Tampilkan notifikasi toast
+                const scoreText = formattedData.skor !== undefined ? formattedData.skor : formattedData.score;
+                tampilkanNotifikasiToast(`Nilai baru masuk: <b>${escapeHtml(formattedData.nama || formattedData.name)}</b> (Skor: ${scoreText})`);
+            });
+
+        } catch (e) {
+            console.error("Gagal menginisialisasi Socket.io:", e);
+        }
+
+        function updateServerStatus(isOnline) {
+            const badge = document.getElementById('server-status-badge');
+            if (!badge) return;
+            if (isOnline) {
+                badge.className = "bg-emerald-200 px-2 py-0.5 rounded text-[10px] font-extrabold text-emerald-900";
+                badge.innerText = "Terhubung Live";
+            } else {
+                badge.className = "bg-rose-200 px-2 py-0.5 rounded text-[10px] font-extrabold text-rose-900";
+                badge.innerText = "Offline (Lokal)";
+            }
+        }
+
+        // 1. FUNGSI KIRIM SKOR KE SERVER BACKEND MILIK SENDIRI (Siswa)
+        async function kirimSkorKeServerMilikSendiri(namaSiswa, skorSiswa, correctCount, totalQuestions) {
+            const payload = {
+                nama: namaSiswa,
+                skor: skorSiswa,
+                correct: correctCount,
+                total: totalQuestions,
+                date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now()
+            };
+
+            // Simpan juga secara lokal di browser sebagai fallback
+            saveLocalRecord(payload);
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/simpan-nilai`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log("Skor tersimpan di DB sendiri:", result);
+                } else {
+                    console.warn("Server merespon dengan status non-OK:", response.status);
+                }
+            } catch (error) {
+                console.error("Gagal mengirim data ke server:", error);
+            }
+        }
+
+        // 2. FUNGSI LOAD DATA PERTAMA KALI UNTUK DASHBOARD GURU
+        async function loadDataRekapGuru() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/rekap-nilai`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const list = Array.isArray(data) ? data : (data.data || []);
+                    window.currentRealtimeRecords = list.map(normalizeDataRow);
+                    renderTabelGuru(window.currentRealtimeRecords);
+                    return;
+                }
+            } catch (error) {
+                console.error("Gagal mengambil data rekap dari server backend:", error);
+            }
+
+            // Fallback: Ambil data dari LocalStorage jika server tidak merespon
+            const localData = getLocalRecords();
+            window.currentRealtimeRecords = localData;
+            renderTabelGuru(window.currentRealtimeRecords);
+        }
+
+        // Helper untuk menormalisasi struktur data dari server/lokal
+        function normalizeDataRow(item) {
+            return {
+                name: item.nama || item.name || 'Siswa',
+                score: item.skor !== undefined ? item.skor : (item.score !== undefined ? item.score : 0),
+                correct: item.correct !== undefined ? item.correct : Math.round((item.skor || item.score || 0) / 10),
+                total: item.total || 10,
+                date: item.date || new Date(item.timestamp || Date.now()).toLocaleString('id-ID'),
+                timestamp: item.timestamp || Date.now()
+            };
+        }
+
+        // Helper Toast Notification
+        function tampilkanNotifikasiToast(pesan) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto bg-slate-900/90 text-white p-3 sm:p-4 rounded-2xl shadow-xl border-2 border-emerald-400 text-xs sm:text-sm flex items-center gap-3 toast-slide-in backdrop-blur-md';
+            toast.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-white font-bold">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div class="flex-1">${pesan}</div>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.transition = 'all 0.4s ease';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
+        // Helper Local Storage Backup
+        function saveLocalRecord(record) {
+            try {
+                let records = getLocalRecords();
+                records.unshift(normalizeDataRow(record));
+                localStorage.setItem('pjok_quiz_recap', JSON.stringify(records));
+            } catch (e) { }
+        }
+
+        function getLocalRecords() {
+            try {
+                const stored = localStorage.getItem('pjok_quiz_recap');
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+    </script>
+
+    <!-- QUIZ LOGIC & CANVAS ENGINE -->
+    <script>
+        /* QUESTION BANK */
         const quizQuestions = [
             {
                 question: "1. Gerakan olahraga yang menggunakan bantuan alat seperti BOLA dinamakan gerak ...",
                 options: ["Lokomotor", "Non-lokomotor", "Manipulatif"],
-                answer: 2, // Index 2 -> Manipulatif
+                answer: 2,
                 type: "general",
                 explanation: "Gerak manipulatif adalah gerak yang memakai benda/alat seperti bola."
             },
@@ -529,33 +665,30 @@
         let selectedOptionIndex = null;
         let animationFrameId = null;
         let canvasState = { action: 'idle', frame: 0 };
+        window.currentRealtimeRecords = [];
 
-        /* Audio Synthesizer (Web Audio API) for Sound Effects without external files */
+        /* Sound Effects Synthesizer */
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playSound(type) {
             try {
-                if (audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
 
                 if (type === 'correct') {
-                    // Upward Arpeggio sound
                     const now = audioCtx.currentTime;
                     osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(523.25, now); // C5
-                    osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1); // E5
-                    osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2); // G5
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1);
+                    osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2);
                     gain.gain.setValueAtTime(0.3, now);
                     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
                     osc.start(now);
                     osc.stop(now + 0.35);
                 } else if (type === 'wrong') {
-                    // Low Boing sound
                     const now = audioCtx.currentTime;
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(220, now);
@@ -565,7 +698,6 @@
                     osc.start(now);
                     osc.stop(now + 0.3);
                 } else if (type === 'fanfare') {
-                    // Fanfare end sound
                     const now = audioCtx.currentTime;
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(440, now);
@@ -577,15 +709,10 @@
                     osc.start(now);
                     osc.stop(now + 0.8);
                 }
-            } catch (e) {
-                console.log("Audio play suppressed");
-            }
+            } catch (e) { }
         }
 
-        /* ==========================================================================
-           HTML5 CANVAS ANIMATION ENGINE
-           Visualizing Throwing, Catching, Kicking, and Hitting actions dynamically!
-           ========================================================================== */
+        /* Canvas Animation Engine */
         const canvas = document.getElementById('quiz-canvas');
         const ctx = canvas.getContext('2d');
 
@@ -601,67 +728,51 @@
             const height = canvas.height;
             const f = canvasState.frame;
 
-            // Clear Canvas Background (Grass & Sky)
             ctx.clearRect(0, 0, width, height);
 
-            // Draw Sky Gradient
+            // Sky
             const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
             skyGrad.addColorStop(0, '#bae6fd');
             skyGrad.addColorStop(1, '#e0f2fe');
             ctx.fillStyle = skyGrad;
             ctx.fillRect(0, 0, width, height);
 
-            // Draw Sun
+            // Sun
             ctx.fillStyle = '#fde047';
             ctx.beginPath();
             ctx.arc(width - 50, 35, 20, 0, Math.PI * 2);
             ctx.fill();
 
-            // Draw Grass Field
+            // Grass
             ctx.fillStyle = '#4ade80';
             ctx.fillRect(0, height - 35, width, 35);
             ctx.fillStyle = '#22c55e';
             ctx.fillRect(0, height - 35, width, 5);
 
-            // Current Question Action Type
             const qType = quizQuestions[currentQuestionIndex]?.type || 'general';
 
             if (canvasState.action === 'correct') {
-                // Success Goal Animation
                 drawSuccessAnimation(width, height, f);
             } else if (canvasState.action === 'wrong') {
-                // Gentle Fail Bounce
                 drawWrongAnimation(width, height, f);
             } else {
-                // Interactive Motion according to action type
                 switch (qType) {
-                    case 'kick':
-                        drawKickingScene(width, height, f);
-                        break;
-                    case 'throw':
-                        drawThrowingScene(width, height, f);
-                        break;
-                    case 'catch':
-                        drawCatchingScene(width, height, f);
-                        break;
-                    case 'hit':
-                        drawHittingScene(width, height, f);
-                        break;
-                    default:
-                        drawBouncingBallsScene(width, height, f);
+                    case 'kick': drawKickingScene(width, height, f); break;
+                    case 'throw': drawThrowingScene(width, height, f); break;
+                    case 'catch': drawCatchingScene(width, height, f); break;
+                    case 'hit': drawHittingScene(width, height, f); break;
+                    default: drawBouncingBallsScene(width, height, f);
                 }
             }
 
             animationFrameId = requestAnimationFrame(renderLoop);
         }
 
-        /* Drawing Helper Stickman */
         function drawStickman(x, y, scale = 1, pose = 'idle') {
             ctx.save();
             ctx.translate(x, y);
             ctx.lineWidth = 4 * scale;
             ctx.strokeStyle = '#1e293b';
-            ctx.fillStyle = '#f87171';
 
             // Head
             ctx.beginPath();
@@ -687,36 +798,28 @@
             ctx.lineTo(0, -10 * scale);
             ctx.stroke();
 
-            // Legs & Arms based on pose
+            // Limbs
             ctx.beginPath();
             if (pose === 'kick') {
-                // Leg kicking
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(15 * scale, -5 * scale);
-                // Arms outstretched
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(-12 * scale, -15 * scale);
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(12 * scale, -20 * scale);
             } else if (pose === 'throw') {
-                // Leg standing
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(-8 * scale, 0);
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(8 * scale, 0);
-                // Arm throwing back
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(-15 * scale, -35 * scale);
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(10 * scale, -15 * scale);
             } else if (pose === 'hit') {
-                // Holding Bat
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(10 * scale, 0);
-                // Arms holding bat angle
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(12 * scale, -30 * scale);
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(8 * scale, -28 * scale);
-                // Bat
                 ctx.lineWidth = 6 * scale;
                 ctx.strokeStyle = '#b45309';
                 ctx.moveTo(10 * scale, -28 * scale);
                 ctx.lineTo(25 * scale, -45 * scale);
             } else {
-                // Default / Catch Pose
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
                 ctx.moveTo(0, -10 * scale); ctx.lineTo(10 * scale, 0);
                 ctx.moveTo(0, -25 * scale); ctx.lineTo(-12 * scale, -25 * scale);
@@ -726,57 +829,47 @@
             ctx.restore();
         }
 
-        /* Draw Animated Scenes */
         function drawKickingScene(w, h, f) {
             drawStickman(100, h - 35, 1, 'kick');
-            // Goal Post on right
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 5;
             ctx.strokeRect(w - 80, h - 110, 60, 75);
-
-            // Ball moving towards goal
             const ballX = 120 + ((f * 3) % (w - 200));
             const ballY = (h - 45) - Math.sin((f * 0.1)) * 15;
-            drawBall(ballX, ballY, 12, '#f97316', 'football');
+            drawBall(ballX, ballY, 12, '#f97316');
         }
 
         function drawThrowingScene(w, h, f) {
             drawStickman(90, h - 35, 1, 'throw');
             drawStickman(w - 90, h - 35, 1, 'catch');
-
-            // Ball flying back and forth
             const t = (Math.sin(f * 0.05) + 1) / 2;
             const ballX = 100 + t * (w - 200);
             const ballY = (h - 60) - Math.sin(t * Math.PI) * 50;
-            drawBall(ballX, ballY, 10, '#ef4444', 'basketball');
+            drawBall(ballX, ballY, 10, '#ef4444');
         }
 
         function drawCatchingScene(w, h, f) {
             drawStickman(w / 2, h - 35, 1.1, 'catch');
-            // Ball falling down to hands
             const cycle = (f % 60) / 60;
             const ballY = 20 + cycle * (h - 100);
-            drawBall(w / 2 + 2, ballY, 10, '#eab308', 'tennis');
+            drawBall(w / 2 + 2, ballY, 10, '#eab308');
         }
 
         function drawHittingScene(w, h, f) {
             drawStickman(120, h - 35, 1, 'hit');
-            // Hit ball flying high
             const t = (f % 80) / 80;
             const ballX = 130 + t * (w - 150);
             const ballY = (h - 60) - Math.sin(t * Math.PI) * 80;
-            drawBall(ballX, ballY, 9, '#3b82f6', 'kasti');
+            drawBall(ballX, ballY, 9, '#3b82f6');
         }
 
         function drawBouncingBallsScene(w, h, f) {
             drawStickman(80, h - 35, 0.9, 'idle');
             drawStickman(w - 80, h - 35, 0.9, 'idle');
-
             const y1 = (h - 45) - Math.abs(Math.sin(f * 0.08)) * 40;
             const y2 = (h - 45) - Math.abs(Math.cos(f * 0.08)) * 40;
-
-            drawBall(w / 2 - 40, y1, 12, '#3b82f6', 'volleyball');
-            drawBall(w / 2 + 40, y2, 10, '#10b981', 'kasti');
+            drawBall(w / 2 - 40, y1, 12, '#3b82f6');
+            drawBall(w / 2 + 40, y2, 10, '#10b981');
         }
 
         function drawSuccessAnimation(w, h, f) {
@@ -784,19 +877,8 @@
             ctx.font = '900 28px Fredoka';
             ctx.textAlign = 'center';
             ctx.fillText('HEBAT! JAWABAN BENAR! 🎉', w / 2, 50);
-
-            // Animated Bouncing Victory Ball
             const bY = (h - 50) - Math.abs(Math.sin(f * 0.15)) * 60;
-            drawBall(w / 2, bY, 18, '#f59e0b', 'football');
-
-            // Floating stars
-            for (let i = 0; i < 5; i++) {
-                const sx = (w / 6) * (i + 1);
-                const sy = 80 + Math.sin(f * 0.1 + i) * 10;
-                ctx.fillStyle = '#fbbf24';
-                ctx.font = '20px serif';
-                ctx.fillText('⭐', sx, sy);
-            }
+            drawBall(w / 2, bY, 18, '#f59e0b');
         }
 
         function drawWrongAnimation(w, h, f) {
@@ -804,13 +886,11 @@
             ctx.font = '900 24px Fredoka';
             ctx.textAlign = 'center';
             ctx.fillText('Ayo Coba Lagi! Semangat! 💪', w / 2, 50);
-
-            // Rolling ball away gently
             const bX = (w / 2) + Math.sin(f * 0.1) * 30;
-            drawBall(bX, h - 45, 14, '#64748b', 'general');
+            drawBall(bX, h - 45, 14, '#64748b');
         }
 
-        function drawBall(x, y, radius, color, type) {
+        function drawBall(x, y, radius, color) {
             ctx.save();
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -819,8 +899,6 @@
             ctx.lineWidth = 2;
             ctx.strokeStyle = '#0f172a';
             ctx.stroke();
-
-            // Ball pattern lines
             ctx.beginPath();
             ctx.strokeStyle = 'rgba(255,255,255,0.6)';
             ctx.moveTo(x - radius + 2, y);
@@ -829,10 +907,7 @@
             ctx.restore();
         }
 
-        /* ==========================================================================
-           QUIZ CORE LOGIC & NAVIGATION
-           ========================================================================== */
-
+        /* NAVIGATION & QUIZ ACTIONS */
         function startQuiz() {
             const nameInput = document.getElementById('student-name');
             const errorMsg = document.getElementById('name-error');
@@ -849,14 +924,10 @@
             nameInput.classList.remove('border-rose-400');
             studentName = trimmedName;
 
-            // Update UI elements
             document.getElementById('display-student-name').innerText = studentName;
-
-            // Switch Screens
             document.getElementById('screen-welcome').classList.add('hidden');
             document.getElementById('screen-quiz').classList.remove('hidden');
 
-            // Reset Quiz State
             currentQuestionIndex = 0;
             score = 0;
             document.getElementById('current-score').innerText = score;
@@ -870,20 +941,16 @@
             selectedOptionIndex = null;
             canvasState.action = 'idle';
 
-            // Reset Feedback & Next Button
             const feedbackBox = document.getElementById('feedback-box');
             feedbackBox.classList.add('hidden');
-            feedbackBox.className = 'hidden p-4 rounded-2xl mb-4 text-center font-bold text-lg border-4 transition-all';
 
             const nextBtn = document.getElementById('next-btn');
             nextBtn.disabled = true;
             nextBtn.className = 'btn-bounce bg-slate-300 text-slate-500 font-extrabold text-lg px-8 py-3 rounded-2xl cursor-not-allowed transition flex items-center gap-2';
 
-            // Set Header Tracker & Question Text
             document.getElementById('question-tracker').innerText = `Soal ${currentQuestionIndex + 1}/${quizQuestions.length}`;
             document.getElementById('question-text').innerText = q.question;
 
-            // Render Option Buttons
             const optionsContainer = document.getElementById('options-container');
             optionsContainer.innerHTML = '';
 
@@ -911,7 +978,7 @@
         }
 
         function selectOption(index) {
-            if (selectedOptionIndex !== null) return; // Prevent changing after answer
+            if (selectedOptionIndex !== null) return;
             selectedOptionIndex = index;
 
             const q = quizQuestions[currentQuestionIndex];
@@ -919,10 +986,9 @@
             const feedbackBox = document.getElementById('feedback-box');
             const nextBtn = document.getElementById('next-btn');
 
-            // Disable all option buttons
             for (let i = 0; i < q.options.length; i++) {
                 const btn = document.getElementById(`option-btn-${i}`);
-                btn.onclick = null; // Remove click listener
+                btn.onclick = null;
                 if (i === q.answer) {
                     btn.classList.remove('border-slate-200');
                     btn.classList.add('border-emerald-500', 'bg-emerald-100', 'text-emerald-900');
@@ -936,35 +1002,24 @@
                 }
             }
 
-            // Canvas action trigger & Sound FX
             if (isCorrect) {
                 score += 10;
                 document.getElementById('current-score').innerText = score;
                 canvasState.action = 'correct';
                 playSound('correct');
 
-                // Trigger Confetti
-                try {
-                    confetti({
-                        particleCount: 50,
-                        spread: 60,
-                        origin: { y: 0.7 }
-                    });
-                } catch (e) { }
+                try { confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } }); } catch (e) { }
 
                 feedbackBox.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 text-2xl mr-2"></i> HORE! JAWABANMU BENAR! 🎉<br><span class="text-sm text-emerald-800 font-semibold">${q.explanation}</span>`;
-                feedbackBox.classList.remove('hidden');
-                feedbackBox.classList.add('bg-emerald-100', 'border-emerald-400', 'text-emerald-900');
+                feedbackBox.className = 'p-4 rounded-2xl mb-4 text-center font-bold text-lg border-4 transition-all bg-emerald-100 border-emerald-400 text-emerald-900 animate-bounce';
             } else {
                 canvasState.action = 'wrong';
                 playSound('wrong');
 
                 feedbackBox.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-600 text-2xl mr-2"></i> UPS! MASIH KURANG TEPAT 😊<br><span class="text-sm text-slate-700 font-semibold">${q.explanation}</span>`;
-                feedbackBox.classList.remove('hidden');
-                feedbackBox.classList.add('bg-amber-100', 'border-amber-400', 'text-amber-900');
+                feedbackBox.className = 'p-4 rounded-2xl mb-4 text-center font-bold text-lg border-4 transition-all bg-amber-100 border-amber-400 text-amber-900';
             }
 
-            // Enable Next Button
             nextBtn.disabled = false;
             nextBtn.className = 'btn-bounce bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-extrabold text-lg px-8 py-3 rounded-2xl shadow-lg border-b-4 border-emerald-700 cursor-pointer transition flex items-center gap-2';
         }
@@ -978,28 +1033,20 @@
             }
         }
 
-        /* ==========================================================================
-           FINISH QUIZ & TEACHER RECAP SAVING
-           ========================================================================== */
-
         async function finishQuiz() {
-            // Cancel Canvas animation
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
-            // Hide Quiz Screen, Show Result Screen
             document.getElementById('screen-quiz').classList.add('hidden');
             document.getElementById('screen-result').classList.remove('hidden');
 
             playSound('fanfare');
 
-            // Set Result Data
             document.getElementById('result-greeting').innerText = `Hebat, ${studentName}! 🎉`;
             document.getElementById('final-score-display').innerText = score;
 
             const correctCount = score / 10;
             document.getElementById('result-summary').innerText = `Kamu menjawab ${correctCount} dari ${quizQuestions.length} soal dengan benar!`;
 
-            // Praise Message & Star Rating based on Score
             const starsContainer = document.getElementById('stars-container');
             const appreciationCard = document.getElementById('appreciation-card');
             const resultIcon = document.getElementById('result-icon');
@@ -1018,19 +1065,12 @@
                 appreciationCard.innerHTML = `<strong>"TETAP SEMANGAT BERLATIH! 💪"</strong><br>Jangan berkecil hati ya! Kamu bisa mencoba kuis ini sekali lagi untuk mendapatkan nilai 100!`;
             }
 
-            // Big Confetti burst for high scores
             if (score >= 70) {
-                try {
-                    confetti({
-                        particleCount: 120,
-                        spread: 100,
-                        origin: { y: 0.6 }
-                    });
-                } catch (e) { }
+                try { confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 } }); } catch (e) { }
             }
 
-            // Save Result to LocalStorage and Firestore Cloud Real-time
-            await saveStudentResult(studentName, score, correctCount, quizQuestions.length);
+            // Kirim Nilai ke Server Backend Milik Sendiri
+            await kirimSkorKeServerMilikSendiri(studentName, score, correctCount, quizQuestions.length);
         }
 
         function restartQuiz() {
@@ -1038,7 +1078,7 @@
             document.getElementById('screen-welcome').classList.remove('hidden');
         }
 
-        /* PIN Security & Realtime Data Handling */
+        /* TEACHER MODAL & VERIFICATION */
         let teacherUnlocked = false;
 
         function openTeacherPinModal() {
@@ -1057,7 +1097,7 @@
 
         function verifyPin() {
             const pin = document.getElementById('pin-input').value.trim();
-            if (pin === '0969' || pin === '1926') { // Default PIN Guru
+            if (pin === '1234' || pin === '1926') {
                 teacherUnlocked = true;
                 closePinModal();
                 showTeacherModal();
@@ -1066,84 +1106,12 @@
             }
         }
 
-        async function saveStudentResult(name, finalScore, correct, total) {
-            const now = new Date();
-            const timeString = now.toLocaleDateString('id-ID', {
-                day: '2-digit', month: 'short', year: 'numeric'
-            }) + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-
-            const newRecord = {
-                name: name,
-                score: finalScore,
-                correct: correct,
-                total: total,
-                date: timeString,
-                timestamp: Date.now()
-            };
-
-            // Save locally
-            let records = [];
-            try {
-                const stored = localStorage.getItem('pjok_quiz_recap');
-                if (stored) records = JSON.parse(stored);
-            } catch (e) { }
-
-            records.unshift(newRecord);
-            localStorage.setItem('pjok_quiz_recap', JSON.stringify(records));
-
-            // Save to Real-time Cloud Firestore
-            if (window.firebaseDb && window.dbCollectionPath && window.firebaseAuth?.currentUser) {
-                try {
-                    const { addDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-                    await addDoc(window.dbCollectionPath, newRecord);
-                } catch (e) {
-                    console.error("Firestore sync notice:", e);
-                }
-            }
+        async function showTeacherModal() {
+            document.getElementById('teacher-modal').classList.remove('hidden');
+            await loadDataRekapGuru();
         }
 
-        // Real-time Firestore Listener
-        window.listenToRealtimeResults = async function () {
-            if (!window.firebaseDb || !window.dbCollectionPath || !window.firebaseAuth?.currentUser) return;
-
-            const { onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-
-            onSnapshot(window.dbCollectionPath, (snapshot) => {
-                let cloudRecords = [];
-                snapshot.forEach((docSnap) => {
-                    cloudRecords.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                // Sort newest first
-                cloudRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                window.currentRealtimeRecords = cloudRecords;
-
-                // Refresh modal if currently visible
-                const modal = document.getElementById('teacher-modal');
-                if (modal && !modal.classList.contains('hidden')) {
-                    renderTeacherTable(cloudRecords);
-                }
-            }, (err) => {
-                console.warn("Realtime listener:", err);
-            });
-        };
-
-        function showTeacherModal() {
-            const modal = document.getElementById('teacher-modal');
-            let records = window.currentRealtimeRecords || [];
-
-            // Fallback to local storage if cloud record is empty
-            if (records.length === 0) {
-                try {
-                    const stored = localStorage.getItem('pjok_quiz_recap');
-                    if (stored) records = JSON.parse(stored);
-                } catch (e) { }
-            }
-
-            renderTeacherTable(records);
-            modal.classList.remove('hidden');
-        }
-
-        function renderTeacherTable(records) {
+        function renderTabelGuru(records) {
             const tbody = document.getElementById('teacher-table-body');
             const emptyMsg = document.getElementById('empty-data-msg');
             tbody.innerHTML = '';
@@ -1153,14 +1121,15 @@
             } else {
                 emptyMsg.classList.add('hidden');
                 records.forEach((rec, idx) => {
+                    const rowData = normalizeDataRow(rec);
                     const tr = document.createElement('tr');
                     tr.className = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
                     tr.innerHTML = `
                         <td class="p-3 border-b font-bold text-slate-500">${idx + 1}</td>
-                        <td class="p-3 border-b font-bold text-emerald-900">${escapeHtml(rec.name || 'Siswa')}</td>
-                        <td class="p-3 border-b text-center"><span class="bg-amber-100 text-amber-900 font-extrabold px-2.5 py-1 rounded-full text-xs">${rec.score}</span></td>
-                        <td class="p-3 border-b text-center font-bold">${rec.correct}/${rec.total}</td>
-                        <td class="p-3 border-b text-slate-500 text-xs">${rec.date || '-'}</td>
+                        <td class="p-3 border-b font-bold text-emerald-900">${escapeHtml(rowData.name)}</td>
+                        <td class="p-3 border-b text-center"><span class="bg-amber-100 text-amber-900 font-extrabold px-2.5 py-1 rounded-full text-xs">${rowData.score}</span></td>
+                        <td class="p-3 border-b text-center font-bold">${rowData.correct}/${rowData.total}</td>
+                        <td class="p-3 border-b text-slate-500 text-xs">${rowData.date}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1172,20 +1141,17 @@
         }
 
         function clearRecapData() {
-            if (confirm("Apakah Ibu Sri Haryati yakin ingin menghapus semua data rekap nilai siswa?")) {
+            if (confirm("Apakah Ibu Sri Haryati yakin ingin menghapus semua rekap nilai di browser ini?")) {
                 localStorage.removeItem('pjok_quiz_recap');
                 window.currentRealtimeRecords = [];
-                showTeacherModal();
+                renderTabelGuru([]);
             }
         }
 
         function downloadCSV() {
             let records = window.currentRealtimeRecords || [];
             if (records.length === 0) {
-                try {
-                    const stored = localStorage.getItem('pjok_quiz_recap');
-                    if (stored) records = JSON.parse(stored);
-                } catch (e) { }
+                records = getLocalRecords();
             }
 
             if (records.length === 0) {
@@ -1197,8 +1163,9 @@
             csvContent += "No,Nama Siswa,Skor Akhir,Jumlah Benar,Total Soal,Tanggal Pengerjaan,Sekolah,Guru\n";
 
             records.forEach((rec, idx) => {
-                const cleanName = `"${(rec.name || 'Siswa').replace(/"/g, '""')}"`;
-                csvContent += `${idx + 1},${cleanName},${rec.score},${rec.correct},${rec.total},"${rec.date}","MIS NU Palangka Raya","Sri Haryati, S.Pd."\n`;
+                const r = normalizeDataRow(rec);
+                const cleanName = `"${r.name.replace(/"/g, '""')}"`;
+                csvContent += `${idx + 1},${cleanName},${r.score},${r.correct},${r.total},"${r.date}","MIS NU Palangka Raya","Sri Haryati, S.Pd."\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
@@ -1211,7 +1178,8 @@
         }
 
         function escapeHtml(text) {
-            return text.replace(/[&<>"']/g, function (m) {
+            if (!text) return '';
+            return String(text).replace(/[&<>"']/g, function (m) {
                 return {
                     '&': '&amp;',
                     '<': '&lt;',
