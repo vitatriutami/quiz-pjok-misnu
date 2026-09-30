@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz PJOK Kelas 2 - Gerak Dasar Manipulatif</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Kids -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Quicksand:wght@500;700&display=swap"
+        rel="stylesheet">
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase state & variables
+        window.firebaseDb = null;
+        window.firebaseAuth = null;
+        window.dbCollectionPath = null;
+        window.currentRealtimeRecords = [];
+
+        async function initFirebase() {
+            try {
+                const firebaseConfig = typeof __firebase_config !== 'undefined'
+                    ? JSON.parse(__firebase_config)
+                    : { apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo-project" };
+
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'pjok-mis-nu-palangkaraya';
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                window.firebaseDb = db;
+                window.firebaseAuth = auth;
+                window.dbCollectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'quiz_results');
+
+                console.log("Firebase initialized for real-time recap.");
+                if (window.listenToRealtimeResults) {
+                    window.listenToRealtimeResults();
+                }
+            } catch (err) {
+                console.warn("Firebase sync fallback:", err);
+            }
+        }
+        initFirebase();
+    </script>
+
+    <style>
+        * {
+            font-family: 'Fredoka', 'Quicksand', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
+            min-height: 100vh;
+        }
+
+        /* Playful button style */
+        .btn-bounce {
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease;
+        }
+
+        .btn-bounce:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-bounce:active {
+            transform: translateY(2px) scale(0.98);
+        }
+
+        /* Custom Card Styling */
+        .kids-card {
+            background: rgba(255, 255, 255, 0.95);
+            border: 4px solid #4ade80;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+            border-radius: 2rem;
+        }
+
+        /* Bounce keyframes for title */
+        @keyframes gentle-bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .animate-title {
+            animation: gentle-bounce 2.5s infinite ease-in-out;
+        }
+
+        /* Custom pulse visual indicator */
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+        }
+
+        .pulse-border {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+
+        /* Hide Scrollbars smoothly */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-between p-3 sm:p-6 text-slate-800 relative min-h-screen">
+
+    <!-- Background Animated Floating Icons -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-20">
+        <i class="fa-solid fa-futbol text-6xl text-emerald-600 absolute top-10 left-10 animate-bounce"
+            style="animation-duration: 3s;"></i>
+        <i class="fa-solid fa-basketball text-6xl text-orange-500 absolute top-1/4 right-12 animate-bounce"
+            style="animation-duration: 4s;"></i>
+        <i class="fa-solid fa-baseball text-5xl text-yellow-500 absolute bottom-20 left-16 animate-bounce"
+            style="animation-duration: 3.5s;"></i>
+        <i class="fa-solid fa-volleyball text-6xl text-blue-500 absolute bottom-10 right-20 animate-bounce"
+            style="animation-duration: 4.5s;"></i>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div class="w-full max-w-3xl z-10 my-auto">
+
+        <!-- SCREEN 1: WELCOME / INPUT NAMA -->
+        <div id="screen-welcome" class="kids-card p-6 sm:p-10 text-center transition-all duration-300">
+            <!-- Header Mascot & School Badge -->
+            <div
+                class="inline-block bg-yellow-300 p-4 rounded-full border-4 border-yellow-400 mb-3 animate-title shadow-lg">
+                <span class="text-5xl sm:text-6xl">⚽🏀</span>
+            </div>
+
+            <div class="mb-2">
+                <span
+                    class="bg-emerald-700 text-white font-extrabold text-xs sm:text-sm px-4 py-1.5 rounded-full tracking-wide shadow-sm uppercase inline-flex items-center gap-1.5">
+                    <i class="fa-solid fa-school"></i> MIS NU PALANGKA RAYA
+                </span>
+            </div>
+
+            <h1 class="text-2xl sm:text-4xl font-extrabold text-emerald-800 tracking-wide mb-1">
+                QUIZ INTERAKTIF PJOK KELAS 2
+            </h1>
+            <p class="text-base sm:text-lg font-bold text-slate-700 mb-4">
+                Materi: <span
+                    class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-300">Gerak Dasar
+                    Manipulatif</span>
+            </p>
+
+            <div
+                class="bg-amber-50 border-2 border-dashed border-amber-300 rounded-2xl p-4 sm:p-5 mb-6 text-slate-700 text-xs sm:text-sm max-w-lg mx-auto shadow-sm">
+                <div
+                    class="font-extrabold text-emerald-900 text-base sm:text-lg mb-1 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-tie text-amber-500"></i>
+                    <span>Guru Pengampu: Sri Haryati, S.Pd.</span>
+                </div>
+                <p class="text-slate-600 font-medium">
+                    Halo Anak Hebat! Kuis ini berisi 10 pertanyaan seru tentang melempar, menangkap, menendang, dan
+                    memukul bola. Tulis nama lengkapmu sebelum mulai ya!
+                </p>
+            </div>
+
+            <!-- Form Input -->
+            <div class="max-w-md mx-auto space-y-4">
+                <div class="text-left">
+                    <label for="student-name" class="block text-base sm:text-lg font-bold text-slate-700 mb-2 pl-2">
+                        <i class="fa-solid fa-user-pen text-emerald-600 mr-1"></i> Ketik Nama Lengkapmu:
+                    </label>
+                    <input type="text" id="student-name" placeholder="Contoh: Budi Santoso..."
+                        class="w-full text-lg sm:text-xl px-5 py-4 border-4 border-emerald-300 rounded-2xl focus:border-emerald-500 focus:outline-none shadow-inner text-emerald-900 font-bold bg-emerald-50/50 transition">
+                    <p id="name-error" class="text-rose-500 font-bold text-sm mt-2 hidden text-left pl-2 animate-pulse">
+                        <i class="fa-solid fa-circle-exclamation mr-1"></i> Ups! Tolong isi nama kamu dulu sebelum mulai
+                        ya!
+                    </p>
+                </div>
+
+                <button onclick="startQuiz()"
+                    class="btn-bounce w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-extrabold text-xl sm:text-2xl py-4 rounded-2xl shadow-lg border-b-4 border-emerald-700 flex items-center justify-center gap-3">
+                    <span>Mulai Kuis Seru!</span>
+                    <i class="fa-solid fa-circle-play"></i>
+                </button>
+
+                <!-- Protected Shortcut for teacher tab view -->
+                <button onclick="openTeacherPinModal()"
+                    class="text-slate-500 hover:text-emerald-700 font-bold text-xs sm:text-sm underline pt-2 inline-flex items-center gap-1.5">
+                    <i class="fa-solid fa-lock text-emerald-600"></i> Area Guru / Rekap Nilai Real-time
+                </button>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: QUIZ INTERAKTIF -->
+        <div id="screen-quiz" class="kids-card p-5 sm:p-8 hidden transition-all duration-300">
+            <!-- Header Bar -->
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-4 border-b-2 border-emerald-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span
+                        class="bg-emerald-500 text-white text-xs sm:text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">PJOK
+                        Kelas 2</span>
+                    <span id="display-student-name"
+                        class="font-bold text-slate-700 text-sm sm:text-base max-w-[150px] truncate">Siswa</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-bold text-slate-500" id="question-tracker">Soal 1/10</span>
+                    <span
+                        class="bg-amber-400 text-amber-950 font-black text-sm px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                        <i class="fa-solid fa-trophy text-amber-700"></i> Skor: <span id="current-score">0</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Visual HTML5 Canvas Animation Area -->
+            <div
+                class="relative bg-gradient-to-b from-sky-200 to-sky-100 rounded-2xl overflow-hidden border-4 border-sky-300 mb-5 shadow-inner">
+                <canvas id="quiz-canvas" width="600" height="180" class="w-full h-36 sm:h-44 block"></canvas>
+                <div
+                    class="absolute top-2 right-2 bg-white/80 backdrop-blur text-xs text-sky-900 font-bold px-2 py-1 rounded-lg shadow">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-500 mr-1"></i> Simulasi Gerakan
+                </div>
+            </div>
+
+            <!-- Question Card -->
+            <div class="mb-6">
+                <h2 id="question-text"
+                    class="text-xl sm:text-2xl font-extrabold text-slate-800 leading-snug min-h-[60px]">
+                    Memuat pertanyaan...
+                </h2>
+            </div>
+
+            <!-- Answer Options Buttons -->
+            <div id="options-container" class="grid grid-cols-1 gap-3 mb-6">
+                <!-- Dynamically populated options -->
+            </div>
+
+            <!-- Encouragement Modal / Feedback Alert (Inline) -->
+            <div id="feedback-box"
+                class="hidden p-4 rounded-2xl mb-4 text-center font-bold text-lg border-4 transition-all animate-bounce">
+                <!-- Feedback message here -->
+            </div>
+
+            <!-- Navigation Button -->
+            <div class="flex justify-end">
+                <button id="next-btn" onclick="nextQuestion()" disabled
+                    class="btn-bounce bg-slate-300 text-slate-500 font-extrabold text-lg px-8 py-3 rounded-2xl cursor-not-allowed transition flex items-center gap-2">
+                    <span>Lanjut</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- SCREEN 3: RESULTS & CELEBRATION -->
+        <div id="screen-result" class="kids-card p-6 sm:p-10 text-center hidden transition-all duration-300">
+            <div class="inline-block bg-emerald-100 p-4 rounded-full border-4 border-emerald-300 mb-3 animate-bounce">
+                <span id="result-icon" class="text-6xl">🏆</span>
+            </div>
+
+            <h1 class="text-3xl sm:text-4xl font-black text-emerald-700 mb-1">HASIL KUIS PJOK</h1>
+            <p id="result-greeting" class="text-xl sm:text-2xl font-extrabold text-slate-800 mb-4">
+                Hebat, [Nama]!
+            </p>
+
+            <!-- Star Rating Badge -->
+            <div id="stars-container" class="flex justify-center gap-2 text-4xl sm:text-5xl text-amber-400 mb-6">
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+            </div>
+
+            <!-- Score Box -->
+            <div
+                class="bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 border-4 border-amber-300 rounded-3xl p-6 mb-6 max-w-md mx-auto shadow-sm">
+                <p class="text-slate-600 font-bold text-lg mb-1">NILAI KAMU:</p>
+                <div class="text-6xl sm:text-7xl font-black text-amber-600 mb-2" id="final-score-display">
+                    100
+                </div>
+                <p id="result-summary" class="text-slate-700 font-bold text-sm sm:text-base">
+                    Kamu menjawab 10 dari 10 soal dengan benar!
+                </p>
+            </div>
+
+            <!-- Encouragement Message Card -->
+            <div id="appreciation-card"
+                class="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 mb-8 text-emerald-900 font-bold text-base sm:text-lg">
+                "Luar biasa! Kamu sudah paham betul gerakan dasar manipulatif seperti melempar, menangkap, menendang,
+                dan memukul bola!"
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row justify-center gap-4 max-w-md mx-auto">
+                <button onclick="restartQuiz()"
+                    class="btn-bounce flex-1 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black text-lg py-4 px-6 rounded-2xl shadow-lg border-b-4 border-amber-600 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>Coba Lagi</span>
+                </button>
+                <button onclick="openTeacherPinModal()"
+                    class="btn-bounce flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg py-4 px-6 rounded-2xl shadow-lg border-b-4 border-emerald-800 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-lock"></i>
+                    <span>Rekap Guru</span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- TEACHER PIN AUTH MODAL -->
+    <div id="pin-modal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div
+            class="bg-white border-4 border-emerald-500 rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl relative">
+            <button onclick="closePinModal()"
+                class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-xl font-bold">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div
+                class="w-14 h-14 bg-emerald-100 rounded-full border-2 border-emerald-400 flex items-center justify-center mx-auto mb-3 text-emerald-700 text-2xl">
+                <i class="fa-solid fa-key"></i>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-800 mb-1">Akses Guru</h3>
+            <p class="text-xs text-slate-500 mb-4">Masukkan PIN khusus untuk membuka Rekap Nilai Siswa Real-time (MIS NU
+                Palangka Raya):</p>
+
+            <input type="password" id="pin-input" maxlength="6" placeholder="Masukkan PIN..."
+                class="w-full text-center text-2xl tracking-widest py-3 border-4 border-slate-300 rounded-2xl font-black text-emerald-900 focus:border-emerald-500 focus:outline-none mb-2">
+
+            <p id="pin-error" class="text-rose-500 font-bold text-xs mb-3 hidden">
+                <i class="fa-solid fa-circle-xmark mr-1"></i> PIN Salah!
+            </p>
+
+            <button onclick="verifyPin()"
+                class="btn-bounce w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow border-b-4 border-emerald-800 text-base">
+                Buka Rekap Real-time
+            </button>
+            <p class="text-[11px] text-slate-400 mt-3 font-semibold">Petunjuk Ibu Sri Haryati, S.Pd.</p>
+        </div>
+    </div>
+
+    <!-- TEACHER RECAP MODAL -->
+    <div id="teacher-modal"
+        class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div
+            class="bg-white border-4 border-emerald-500 rounded-3xl max-w-2xl w-full p-6 sm:p-8 max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="flex justify-between items-center mb-3 border-b pb-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-user-graduate text-2xl text-emerald-600"></i>
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-800">Rekap Nilai Real-time</h3>
+                    </div>
+                    <p class="text-xs font-bold text-emerald-700">MIS NU Palangka Raya &bull; Pengampu: Sri Haryati,
+                        S.Pd.</p>
+                </div>
+                <button onclick="closeTeacherModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                </button>
+            </div>
+
+            <div
+                class="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 mb-3 text-xs text-emerald-800 font-semibold flex items-center justify-between">
+                <span><i class="fa-solid fa-wifi text-emerald-600 mr-1 animate-pulse"></i> Database Cloud Real-Time
+                    Aktif</span>
+                <span class="bg-emerald-200 px-2 py-0.5 rounded text-[10px] font-extrabold text-emerald-900">Otomatis
+                    Ter-update</span>
+            </div>
+
+            <!-- Table area -->
+            <div class="overflow-y-auto flex-1 mb-4 border rounded-xl no-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-emerald-100 text-emerald-900 sticky top-0 font-bold text-sm sm:text-base">
+                        <tr>
+                            <th class="p-3 border-b">No</th>
+                            <th class="p-3 border-b">Nama Siswa</th>
+                            <th class="p-3 border-b text-center">Skor</th>
+                            <th class="p-3 border-b text-center">Benar/Total</th>
+                            <th class="p-3 border-b">Tanggal & Waktu</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teacher-table-body" class="text-sm font-semibold text-slate-700 divide-y">
+                        <!-- Data rows inserted via JS -->
+                    </tbody>
+                </table>
+                <div id="empty-data-msg" class="text-center py-8 text-slate-400 font-bold hidden">
+                    Belum ada data nilai siswa. Silakan lakukan pengerjaan kuis terlebih dahulu!
+                </div>
+            </div>
+
+            <!-- Modal Bottom Actions -->
+            <div class="flex flex-wrap justify-between items-center gap-3 pt-2 border-t">
+                <button onclick="clearRecapData()"
+                    class="text-rose-600 hover:text-rose-800 font-bold text-xs sm:text-sm flex items-center gap-1">
+                    <i class="fa-solid fa-trash-can"></i> Hapus Semua Data
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="downloadCSV()"
+                        class="btn-bounce bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow border-b-2 border-emerald-800 flex items-center gap-2">
+                        <i class="fa-solid fa-file-csv text-lg"></i> Unduh Rekap (CSV)
+                    </button>
+                    <button onclick="closeTeacherModal()"
+                        class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-8 text-center text-slate-700 font-bold text-xs sm:text-sm z-10">
+        Quiz PJOK Kelas 2 SD/MI &bull; MIS NU Palangka Raya &bull; Sri Haryati, S.Pd.
+    </footer>
+
+    <script>
+        /* ==========================================================================
+           QUESTION BANK (10 Questions PJOK Kelas 2 SD/MI - Gerak Manipulatif)
+           ========================================================================== */
+        const quizQuestions = [
+            {
+                question: "1. Gerakan olahraga yang menggunakan bantuan alat seperti BOLA dinamakan gerak ...",
+                options: ["Lokomotor", "Non-lokomotor", "Manipulatif"],
+                answer: 2, // Index 2 -> Manipulatif
+                type: "general",
+                explanation: "Gerak manipulatif adalah gerak yang memakai benda/alat seperti bola."
+            },
+            {
+                question: "2. Saat kita hendak MELEMPAR bola kasti, anggota tubuh yang kita gunakan adalah ...",
+                options: ["Kaki", "Tangan", "Kepala"],
+                answer: 1,
+                type: "throw",
+                explanation: "Melempar bola dilakukan menggunakan tangan."
+            },
+            {
+                question: "3. Gerakan mendorong bola menggunakan KAKI agar bergerak ke gawang dinamakan ...",
+                options: ["Menangkap", "Memukul", "Menendang"],
+                answer: 2,
+                type: "kick",
+                explanation: "Menendang bola dilakukan dengan menggunakan kaki."
+            },
+            {
+                question: "4. Contoh olahraga di bawah ini yang menggunakan BOLA BESAR adalah ...",
+                options: ["Kasti", "Tenis Meja", "Sepak Bola"],
+                answer: 2,
+                type: "kick",
+                explanation: "Sepak bola, basket, dan voli menggunakan bola besar."
+            },
+            {
+                question: "5. Agar kita bisa MENANGKAP bola dengan baik, pandangan mata kita harus melihat ke ...",
+                options: ["Arah datangnya bola", "Samping kiri dan kanan", "Tanah / Rumput"],
+                answer: 0,
+                type: "catch",
+                explanation: "Mata harus fokus melihat ke arah datangnya bola."
+            },
+            {
+                question: "6. Saat bermain bola kasti, alat kayu yang kita pegang untuk memukul bola adalah ...",
+                options: ["Raket", "Tongkat Pemukul", "Sapu"],
+                answer: 1,
+                type: "hit",
+                explanation: "Tongkat pemukul kayu digunakan untuk memukul bola kasti."
+            },
+            {
+                question: "7. Melempar bola basket ke dada teman di dekat kita sebaiknya menggunakan ... tangan.",
+                options: ["Satu", "Dua", "Tiga"],
+                answer: 1,
+                type: "throw",
+                explanation: "Melempar bola besar seperti bola basket ke dada menggunakan dua tangan."
+            },
+            {
+                question: "8. Manakah di bawah ini yang merupakan contoh BOLA KECIL?",
+                options: ["Bola Basket", "Bola Voli", "Bola Kasti"],
+                answer: 2,
+                type: "catch",
+                explanation: "Bola kasti dan bola tenis termasuk dalam kategori bola kecil."
+            },
+            {
+                question: "9. Menghentikan bola melayang di udara menggunakan kedua tangan dinamakan ...",
+                options: ["Menangkap Bola", "Menendang Bola", "Memukul Bola"],
+                answer: 0,
+                type: "catch",
+                explanation: "Menangkap bola dilakukan dengan merapatkan kedua tangan."
+            },
+            {
+                question: "10. Menendang bola plastik ke arah botol bekas bertujuan untuk melatih ...",
+                options: ["Kecepatan tidur", "Ketepatan / Sasaran", "Pendengaran"],
+                answer: 1,
+                type: "kick",
+                explanation: "Menembak sasaran botol melatih akurasi dan ketepatan tendangan."
+            }
+        ];
+
+        /* Global App State */
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let studentName = "";
+        let selectedOptionIndex = null;
+        let animationFrameId = null;
+        let canvasState = { action: 'idle', frame: 0 };
+
+        /* Audio Synthesizer (Web Audio API) for Sound Effects without external files */
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'correct') {
+                    // Upward Arpeggio sound
+                    const now = audioCtx.currentTime;
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2); // G5
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'wrong') {
+                    // Low Boing sound
+                    const now = audioCtx.currentTime;
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.exponentialRampToValueAtTime(130, now + 0.25);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'fanfare') {
+                    // Fanfare end sound
+                    const now = audioCtx.currentTime;
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(554.37, now + 0.15);
+                    osc.frequency.setValueAtTime(659.25, now + 0.3);
+                    osc.frequency.setValueAtTime(880, now + 0.45);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                    osc.start(now);
+                    osc.stop(now + 0.8);
+                }
+            } catch (e) {
+                console.log("Audio play suppressed");
+            }
+        }
+
+        /* ==========================================================================
+           HTML5 CANVAS ANIMATION ENGINE
+           Visualizing Throwing, Catching, Kicking, and Hitting actions dynamically!
+           ========================================================================== */
+        const canvas = document.getElementById('quiz-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function initCanvasAnimation() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            canvasState.frame = 0;
+            renderLoop();
+        }
+
+        function renderLoop() {
+            canvasState.frame++;
+            const width = canvas.width;
+            const height = canvas.height;
+            const f = canvasState.frame;
+
+            // Clear Canvas Background (Grass & Sky)
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw Sky Gradient
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+            skyGrad.addColorStop(0, '#bae6fd');
+            skyGrad.addColorStop(1, '#e0f2fe');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw Sun
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(width - 50, 35, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw Grass Field
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(0, height - 35, width, 35);
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(0, height - 35, width, 5);
+
+            // Current Question Action Type
+            const qType = quizQuestions[currentQuestionIndex]?.type || 'general';
+
+            if (canvasState.action === 'correct') {
+                // Success Goal Animation
+                drawSuccessAnimation(width, height, f);
+            } else if (canvasState.action === 'wrong') {
+                // Gentle Fail Bounce
+                drawWrongAnimation(width, height, f);
+            } else {
+                // Interactive Motion according to action type
+                switch (qType) {
+                    case 'kick':
+                        drawKickingScene(width, height, f);
+                        break;
+                    case 'throw':
+                        drawThrowingScene(width, height, f);
+                        break;
+                    case 'catch':
+                        drawCatchingScene(width, height, f);
+                        break;
+                    case 'hit':
+                        drawHittingScene(width, height, f);
+                        break;
+                    default:
+                        drawBouncingBallsScene(width, height, f);
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        /* Drawing Helper Stickman */
+        function drawStickman(x, y, scale = 1, pose = 'idle') {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.lineWidth = 4 * scale;
+            ctx.strokeStyle = '#1e293b';
+            ctx.fillStyle = '#f87171';
+
+            // Head
+            ctx.beginPath();
+            ctx.arc(0, -40 * scale, 12 * scale, 0, Math.PI * 2);
+            ctx.fillStyle = '#fde047';
+            ctx.fill();
+            ctx.stroke();
+
+            // Eyes
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(3 * scale, -42 * scale, 2 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Smile
+            ctx.beginPath();
+            ctx.arc(2 * scale, -38 * scale, 5 * scale, 0.1, Math.PI * 0.9);
+            ctx.stroke();
+
+            // Body
+            ctx.beginPath();
+            ctx.moveTo(0, -28 * scale);
+            ctx.lineTo(0, -10 * scale);
+            ctx.stroke();
+
+            // Legs & Arms based on pose
+            ctx.beginPath();
+            if (pose === 'kick') {
+                // Leg kicking
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(15 * scale, -5 * scale);
+                // Arms outstretched
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(-12 * scale, -15 * scale);
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(12 * scale, -20 * scale);
+            } else if (pose === 'throw') {
+                // Leg standing
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(-8 * scale, 0);
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(8 * scale, 0);
+                // Arm throwing back
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(-15 * scale, -35 * scale);
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(10 * scale, -15 * scale);
+            } else if (pose === 'hit') {
+                // Holding Bat
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(10 * scale, 0);
+                // Arms holding bat angle
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(12 * scale, -30 * scale);
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(8 * scale, -28 * scale);
+                // Bat
+                ctx.lineWidth = 6 * scale;
+                ctx.strokeStyle = '#b45309';
+                ctx.moveTo(10 * scale, -28 * scale);
+                ctx.lineTo(25 * scale, -45 * scale);
+            } else {
+                // Default / Catch Pose
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(-10 * scale, 0);
+                ctx.moveTo(0, -10 * scale); ctx.lineTo(10 * scale, 0);
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(-12 * scale, -25 * scale);
+                ctx.moveTo(0, -25 * scale); ctx.lineTo(12 * scale, -25 * scale);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        /* Draw Animated Scenes */
+        function drawKickingScene(w, h, f) {
+            drawStickman(100, h - 35, 1, 'kick');
+            // Goal Post on right
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(w - 80, h - 110, 60, 75);
+
+            // Ball moving towards goal
+            const ballX = 120 + ((f * 3) % (w - 200));
+            const ballY = (h - 45) - Math.sin((f * 0.1)) * 15;
+            drawBall(ballX, ballY, 12, '#f97316', 'football');
+        }
+
+        function drawThrowingScene(w, h, f) {
+            drawStickman(90, h - 35, 1, 'throw');
+            drawStickman(w - 90, h - 35, 1, 'catch');
+
+            // Ball flying back and forth
+            const t = (Math.sin(f * 0.05) + 1) / 2;
+            const ballX = 100 + t * (w - 200);
+            const ballY = (h - 60) - Math.sin(t * Math.PI) * 50;
+            drawBall(ballX, ballY, 10, '#ef4444', 'basketball');
+        }
+
+        function drawCatchingScene(w, h, f) {
+            drawStickman(w / 2, h - 35, 1.1, 'catch');
+            // Ball falling down to hands
+            const cycle = (f % 60) / 60;
+            const ballY = 20 + cycle * (h - 100);
+            drawBall(w / 2 + 2, ballY, 10, '#eab308', 'tennis');
+        }
+
+        function drawHittingScene(w, h, f) {
+            drawStickman(120, h - 35, 1, 'hit');
+            // Hit ball flying high
+            const t = (f % 80) / 80;
+            const ballX = 130 + t * (w - 150);
+            const ballY = (h - 60) - Math.sin(t * Math.PI) * 80;
+            drawBall(ballX, ballY, 9, '#3b82f6', 'kasti');
+        }
+
+        function drawBouncingBallsScene(w, h, f) {
+            drawStickman(80, h - 35, 0.9, 'idle');
+            drawStickman(w - 80, h - 35, 0.9, 'idle');
+
+            const y1 = (h - 45) - Math.abs(Math.sin(f * 0.08)) * 40;
+            const y2 = (h - 45) - Math.abs(Math.cos(f * 0.08)) * 40;
+
+            drawBall(w / 2 - 40, y1, 12, '#3b82f6', 'volleyball');
+            drawBall(w / 2 + 40, y2, 10, '#10b981', 'kasti');
+        }
+
+        function drawSuccessAnimation(w, h, f) {
+            ctx.fillStyle = '#047857';
+            ctx.font = '900 28px Fredoka';
+            ctx.textAlign = 'center';
+            ctx.fillText('HEBAT! JAWABAN BENAR! 🎉', w / 2, 50);
+
+            // Animated Bouncing Victory Ball
+            const bY = (h - 50) - Math.abs(Math.sin(f * 0.15)) * 60;
+            drawBall(w / 2, bY, 18, '#f59e0b', 'football');
+
+            // Floating stars
+            for (let i = 0; i < 5; i++) {
+                const sx = (w / 6) * (i + 1);
+                const sy = 80 + Math.sin(f * 0.1 + i) * 10;
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = '20px serif';
+                ctx.fillText('⭐', sx, sy);
+            }
+        }
+
+        function drawWrongAnimation(w, h, f) {
+            ctx.fillStyle = '#b91c1c';
+            ctx.font = '900 24px Fredoka';
+            ctx.textAlign = 'center';
+            ctx.fillText('Ayo Coba Lagi! Semangat! 💪', w / 2, 50);
+
+            // Rolling ball away gently
+            const bX = (w / 2) + Math.sin(f * 0.1) * 30;
+            drawBall(bX, h - 45, 14, '#64748b', 'general');
+        }
+
+        function drawBall(x, y, radius, color, type) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#0f172a';
+            ctx.stroke();
+
+            // Ball pattern lines
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.moveTo(x - radius + 2, y);
+            ctx.lineTo(x + radius - 2, y);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        /* ==========================================================================
+           QUIZ CORE LOGIC & NAVIGATION
+           ========================================================================== */
+
+        function startQuiz() {
+            const nameInput = document.getElementById('student-name');
+            const errorMsg = document.getElementById('name-error');
+            const trimmedName = nameInput.value.trim();
+
+            if (!trimmedName) {
+                errorMsg.classList.remove('hidden');
+                nameInput.classList.add('border-rose-400');
+                nameInput.focus();
+                return;
+            }
+
+            errorMsg.classList.add('hidden');
+            nameInput.classList.remove('border-rose-400');
+            studentName = trimmedName;
+
+            // Update UI elements
+            document.getElementById('display-student-name').innerText = studentName;
+
+            // Switch Screens
+            document.getElementById('screen-welcome').classList.add('hidden');
+            document.getElementById('screen-quiz').classList.remove('hidden');
+
+            // Reset Quiz State
+            currentQuestionIndex = 0;
+            score = 0;
+            document.getElementById('current-score').innerText = score;
+
+            initCanvasAnimation();
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            const q = quizQuestions[currentQuestionIndex];
+            selectedOptionIndex = null;
+            canvasState.action = 'idle';
+
+            // Reset Feedback & Next Button
+            const feedbackBox = document.getElementById('feedback-box');
+            feedbackBox.classList.add('hidden');
+            feedbackBox.className = 'hidden p-4 rounded-2xl mb-4 text-center font-bold text-lg border-4 transition-all';
+
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.disabled = true;
+            nextBtn.className = 'btn-bounce bg-slate-300 text-slate-500 font-extrabold text-lg px-8 py-3 rounded-2xl cursor-not-allowed transition flex items-center gap-2';
+
+            // Set Header Tracker & Question Text
+            document.getElementById('question-tracker').innerText = `Soal ${currentQuestionIndex + 1}/${quizQuestions.length}`;
+            document.getElementById('question-text').innerText = q.question;
+
+            // Render Option Buttons
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            const optionLabels = ['A', 'B', 'C'];
+            const buttonColors = [
+                'hover:border-amber-400 hover:bg-amber-50',
+                'hover:border-sky-400 hover:bg-sky-50',
+                'hover:border-emerald-400 hover:bg-emerald-50'
+            ];
+
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `btn-bounce w-full text-left p-4 sm:p-5 rounded-2xl border-4 border-slate-200 bg-white font-bold text-lg sm:text-xl text-slate-700 flex items-center gap-4 transition shadow-sm ${buttonColors[idx % 3]}`;
+                btn.onclick = () => selectOption(idx);
+                btn.id = `option-btn-${idx}`;
+                btn.innerHTML = `
+                    <span class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-100 text-slate-700 border-2 border-slate-300 font-extrabold flex items-center justify-center text-lg sm:text-xl shrink-0">
+                        ${optionLabels[idx]}
+                    </span>
+                    <span class="flex-1">${opt}</span>
+                    <i class="fa-regular fa-circle text-2xl text-slate-300 icon-status"></i>
+                `;
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function selectOption(index) {
+            if (selectedOptionIndex !== null) return; // Prevent changing after answer
+            selectedOptionIndex = index;
+
+            const q = quizQuestions[currentQuestionIndex];
+            const isCorrect = (index === q.answer);
+            const feedbackBox = document.getElementById('feedback-box');
+            const nextBtn = document.getElementById('next-btn');
+
+            // Disable all option buttons
+            for (let i = 0; i < q.options.length; i++) {
+                const btn = document.getElementById(`option-btn-${i}`);
+                btn.onclick = null; // Remove click listener
+                if (i === q.answer) {
+                    btn.classList.remove('border-slate-200');
+                    btn.classList.add('border-emerald-500', 'bg-emerald-100', 'text-emerald-900');
+                    btn.querySelector('.icon-status').className = 'fa-solid fa-circle-check text-2xl text-emerald-600';
+                } else if (i === index && !isCorrect) {
+                    btn.classList.remove('border-slate-200');
+                    btn.classList.add('border-rose-400', 'bg-rose-100', 'text-rose-900');
+                    btn.querySelector('.icon-status').className = 'fa-solid fa-circle-xmark text-2xl text-rose-500';
+                } else {
+                    btn.classList.add('opacity-50');
+                }
+            }
+
+            // Canvas action trigger & Sound FX
+            if (isCorrect) {
+                score += 10;
+                document.getElementById('current-score').innerText = score;
+                canvasState.action = 'correct';
+                playSound('correct');
+
+                // Trigger Confetti
+                try {
+                    confetti({
+                        particleCount: 50,
+                        spread: 60,
+                        origin: { y: 0.7 }
+                    });
+                } catch (e) { }
+
+                feedbackBox.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 text-2xl mr-2"></i> HORE! JAWABANMU BENAR! 🎉<br><span class="text-sm text-emerald-800 font-semibold">${q.explanation}</span>`;
+                feedbackBox.classList.remove('hidden');
+                feedbackBox.classList.add('bg-emerald-100', 'border-emerald-400', 'text-emerald-900');
+            } else {
+                canvasState.action = 'wrong';
+                playSound('wrong');
+
+                feedbackBox.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-600 text-2xl mr-2"></i> UPS! MASIH KURANG TEPAT 😊<br><span class="text-sm text-slate-700 font-semibold">${q.explanation}</span>`;
+                feedbackBox.classList.remove('hidden');
+                feedbackBox.classList.add('bg-amber-100', 'border-amber-400', 'text-amber-900');
+            }
+
+            // Enable Next Button
+            nextBtn.disabled = false;
+            nextBtn.className = 'btn-bounce bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-extrabold text-lg px-8 py-3 rounded-2xl shadow-lg border-b-4 border-emerald-700 cursor-pointer transition flex items-center gap-2';
+        }
+
+        function nextQuestion() {
+            if (currentQuestionIndex < quizQuestions.length - 1) {
+                currentQuestionIndex++;
+                loadQuestion();
+            } else {
+                finishQuiz();
+            }
+        }
+
+        /* ==========================================================================
+           FINISH QUIZ & TEACHER RECAP SAVING
+           ========================================================================== */
+
+        async function finishQuiz() {
+            // Cancel Canvas animation
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            // Hide Quiz Screen, Show Result Screen
+            document.getElementById('screen-quiz').classList.add('hidden');
+            document.getElementById('screen-result').classList.remove('hidden');
+
+            playSound('fanfare');
+
+            // Set Result Data
+            document.getElementById('result-greeting').innerText = `Hebat, ${studentName}! 🎉`;
+            document.getElementById('final-score-display').innerText = score;
+
+            const correctCount = score / 10;
+            document.getElementById('result-summary').innerText = `Kamu menjawab ${correctCount} dari ${quizQuestions.length} soal dengan benar!`;
+
+            // Praise Message & Star Rating based on Score
+            const starsContainer = document.getElementById('stars-container');
+            const appreciationCard = document.getElementById('appreciation-card');
+            const resultIcon = document.getElementById('result-icon');
+
+            if (score >= 80) {
+                resultIcon.innerText = '🏆';
+                starsContainer.innerHTML = '<i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>';
+                appreciationCard.innerHTML = `<strong>"LUAR BIASA BINTANG UTAMA! 🌟"</strong><br>Kamu adalah Juara PJOK MIS NU Palangka Raya! Kamu sudah menguasai semua gerakan melempar, menangkap, menendang, dan memukul bola dengan sangat baik!`;
+            } else if (score >= 60) {
+                resultIcon.innerText = '🥇';
+                starsContainer.innerHTML = '<i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-regular fa-star text-slate-300"></i>';
+                appreciationCard.innerHTML = `<strong>"HEBAT DAN BAGUS SANGAT! 👍"</strong><br>Hasilmu sudah bagus! Teruskan berlatih gerakan manipulatif bersama Ibu Sri Haryati, S.Pd.!`;
+            } else {
+                resultIcon.innerText = '⚽';
+                starsContainer.innerHTML = '<i class="fa-solid fa-star"></i><i class="fa-regular fa-star text-slate-300"></i><i class="fa-regular fa-star text-slate-300"></i>';
+                appreciationCard.innerHTML = `<strong>"TETAP SEMANGAT BERLATIH! 💪"</strong><br>Jangan berkecil hati ya! Kamu bisa mencoba kuis ini sekali lagi untuk mendapatkan nilai 100!`;
+            }
+
+            // Big Confetti burst for high scores
+            if (score >= 70) {
+                try {
+                    confetti({
+                        particleCount: 120,
+                        spread: 100,
+                        origin: { y: 0.6 }
+                    });
+                } catch (e) { }
+            }
+
+            // Save Result to LocalStorage and Firestore Cloud Real-time
+            await saveStudentResult(studentName, score, correctCount, quizQuestions.length);
+        }
+
+        function restartQuiz() {
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-welcome').classList.remove('hidden');
+        }
+
+        /* PIN Security & Realtime Data Handling */
+        let teacherUnlocked = false;
+
+        function openTeacherPinModal() {
+            if (teacherUnlocked) {
+                showTeacherModal();
+                return;
+            }
+            document.getElementById('pin-input').value = '';
+            document.getElementById('pin-error').classList.add('hidden');
+            document.getElementById('pin-modal').classList.remove('hidden');
+        }
+
+        function closePinModal() {
+            document.getElementById('pin-modal').classList.add('hidden');
+        }
+
+        function verifyPin() {
+            const pin = document.getElementById('pin-input').value.trim();
+            if (pin === '0969' || pin === '1926') { // Default PIN Guru
+                teacherUnlocked = true;
+                closePinModal();
+                showTeacherModal();
+            } else {
+                document.getElementById('pin-error').classList.remove('hidden');
+            }
+        }
+
+        async function saveStudentResult(name, finalScore, correct, total) {
+            const now = new Date();
+            const timeString = now.toLocaleDateString('id-ID', {
+                day: '2-digit', month: 'short', year: 'numeric'
+            }) + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+            const newRecord = {
+                name: name,
+                score: finalScore,
+                correct: correct,
+                total: total,
+                date: timeString,
+                timestamp: Date.now()
+            };
+
+            // Save locally
+            let records = [];
+            try {
+                const stored = localStorage.getItem('pjok_quiz_recap');
+                if (stored) records = JSON.parse(stored);
+            } catch (e) { }
+
+            records.unshift(newRecord);
+            localStorage.setItem('pjok_quiz_recap', JSON.stringify(records));
+
+            // Save to Real-time Cloud Firestore
+            if (window.firebaseDb && window.dbCollectionPath && window.firebaseAuth?.currentUser) {
+                try {
+                    const { addDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                    await addDoc(window.dbCollectionPath, newRecord);
+                } catch (e) {
+                    console.error("Firestore sync notice:", e);
+                }
+            }
+        }
+
+        // Real-time Firestore Listener
+        window.listenToRealtimeResults = async function () {
+            if (!window.firebaseDb || !window.dbCollectionPath || !window.firebaseAuth?.currentUser) return;
+
+            const { onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+            onSnapshot(window.dbCollectionPath, (snapshot) => {
+                let cloudRecords = [];
+                snapshot.forEach((docSnap) => {
+                    cloudRecords.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                // Sort newest first
+                cloudRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                window.currentRealtimeRecords = cloudRecords;
+
+                // Refresh modal if currently visible
+                const modal = document.getElementById('teacher-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    renderTeacherTable(cloudRecords);
+                }
+            }, (err) => {
+                console.warn("Realtime listener:", err);
+            });
+        };
+
+        function showTeacherModal() {
+            const modal = document.getElementById('teacher-modal');
+            let records = window.currentRealtimeRecords || [];
+
+            // Fallback to local storage if cloud record is empty
+            if (records.length === 0) {
+                try {
+                    const stored = localStorage.getItem('pjok_quiz_recap');
+                    if (stored) records = JSON.parse(stored);
+                } catch (e) { }
+            }
+
+            renderTeacherTable(records);
+            modal.classList.remove('hidden');
+        }
+
+        function renderTeacherTable(records) {
+            const tbody = document.getElementById('teacher-table-body');
+            const emptyMsg = document.getElementById('empty-data-msg');
+            tbody.innerHTML = '';
+
+            if (!records || records.length === 0) {
+                emptyMsg.classList.remove('hidden');
+            } else {
+                emptyMsg.classList.add('hidden');
+                records.forEach((rec, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+                    tr.innerHTML = `
+                        <td class="p-3 border-b font-bold text-slate-500">${idx + 1}</td>
+                        <td class="p-3 border-b font-bold text-emerald-900">${escapeHtml(rec.name || 'Siswa')}</td>
+                        <td class="p-3 border-b text-center"><span class="bg-amber-100 text-amber-900 font-extrabold px-2.5 py-1 rounded-full text-xs">${rec.score}</span></td>
+                        <td class="p-3 border-b text-center font-bold">${rec.correct}/${rec.total}</td>
+                        <td class="p-3 border-b text-slate-500 text-xs">${rec.date || '-'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function closeTeacherModal() {
+            document.getElementById('teacher-modal').classList.add('hidden');
+        }
+
+        function clearRecapData() {
+            if (confirm("Apakah Ibu Sri Haryati yakin ingin menghapus semua data rekap nilai siswa?")) {
+                localStorage.removeItem('pjok_quiz_recap');
+                window.currentRealtimeRecords = [];
+                showTeacherModal();
+            }
+        }
+
+        function downloadCSV() {
+            let records = window.currentRealtimeRecords || [];
+            if (records.length === 0) {
+                try {
+                    const stored = localStorage.getItem('pjok_quiz_recap');
+                    if (stored) records = JSON.parse(stored);
+                } catch (e) { }
+            }
+
+            if (records.length === 0) {
+                alert("Belum ada data nilai untuk diunduh!");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "No,Nama Siswa,Skor Akhir,Jumlah Benar,Total Soal,Tanggal Pengerjaan,Sekolah,Guru\n";
+
+            records.forEach((rec, idx) => {
+                const cleanName = `"${(rec.name || 'Siswa').replace(/"/g, '""')}"`;
+                csvContent += `${idx + 1},${cleanName},${rec.score},${rec.correct},${rec.total},"${rec.date}","MIS NU Palangka Raya","Sri Haryati, S.Pd."\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Rekap_Nilai_PJOK_MIS_NU_PalangkaRaya_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/[&<>"']/g, function (m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
+        }
+    </script>
+</body>
+
+</html>
